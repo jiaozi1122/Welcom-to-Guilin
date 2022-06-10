@@ -1,0 +1,35 @@
+{
+	"name": "ARMADFdemo2",
+	"properties": {
+		"globalParameters": {
+			"testglobal": {
+				"type": "string",
+				"value": "override the value with CLI"
+			},
+			"testglobal2": {
+				"type": "string",
+				"value": "test"
+			}
+		},
+		"encryption": {
+			"keyName": "adfcmk2",
+			"vaultBaseUrl": "https://qialia-key-east-us.vault.azure.net",
+			"keyVersion": "6f40306434a44aa1a9127e0658b89c1b",
+			"identity": {
+				"userAssignedIdentity": "/subscriptions/873484ad-b4c7-47e4-9e91-2752add308ed/resourceGroups/qialia/providers/Microsoft.ManagedIdentity/userAssignedIdentities/qialiausermi"
+			}
+		}
+	},
+	"location": "northeurope",
+	"identity": {
+		"type": "SystemAssigned,UserAssigned",
+		"principalId": "13fbcc12-ee4a-40b6-80be-bc998d6e1ed6",
+		"tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47",
+		"userAssignedIdentities": {
+			"/subscriptions/873484ad-b4c7-47e4-9e91-2752add308ed/resourcegroups/qialia/providers/Microsoft.ManagedIdentity/userAssignedIdentities/qialiausermi": {
+				"clientId": "9e28cb6d-cdbf-4951-ac68-1a68397c18c8",
+				"principalId": "e5c9a3e0-0b60-40e7-a2af-21f28b46ff8d"
+			}
+		}
+	}
+}
