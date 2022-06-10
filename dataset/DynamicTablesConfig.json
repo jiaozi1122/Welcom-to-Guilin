@@ -1,0 +1,70 @@
+{
+	"name": "DynamicTablesConfig",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "D365ADLS",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"ParametersFileName": {
+				"type": "String"
+			},
+			"ParametersFileRoot": {
+				"type": "String"
+			},
+			"ParametersFileDirectory": {
+				"type": "String"
+			},
+			"ParametersFileSheetName": {
+				"type": "String"
+			}
+		},
+		"annotations": [],
+		"type": "Excel",
+		"typeProperties": {
+			"sheetName": {
+				"value": "@dataset().ParametersFileSheetName",
+				"type": "Expression"
+			},
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": {
+					"value": "@dataset().ParametersFileName",
+					"type": "Expression"
+				},
+				"folderPath": {
+					"value": "@dataset().ParametersFileDirectory",
+					"type": "Expression"
+				},
+				"fileSystem": {
+					"value": "@dataset().ParametersFileRoot",
+					"type": "Expression"
+				}
+			},
+			"firstRowAsHeader": true
+		},
+		"schema": [
+			{
+				"name": "EntityName",
+				"type": "String"
+			},
+			{
+				"name": "ManifestName",
+				"type": "String"
+			},
+			{
+				"name": "EntityPath",
+				"type": "String"
+			},
+			{
+				"name": "Container",
+				"type": "String"
+			},
+			{
+				"name": "FolderPath",
+				"type": "String"
+			}
+		]
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

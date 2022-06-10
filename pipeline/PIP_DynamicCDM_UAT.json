@@ -1,0 +1,875 @@
+{
+	"name": "PIP_DynamicCDM_UAT",
+	"properties": {
+		"activities": [
+			{
+				"name": "LKP_CSV",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Set_FUllLoadLimitDate",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "ExcelSource",
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						}
+					},
+					"dataset": {
+						"referenceName": "DynamicTablesConfig",
+						"type": "DatasetReference",
+						"parameters": {
+							"ParametersFileName": "CDM_parameters_UAT.xlsx",
+							"ParametersFileRoot": "gdp-adls-poc",
+							"ParametersFileDirectory": "ParametersFiles",
+							"ParametersFileSheetName": "FullLoad"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "ForEach_Table",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "LKP_CSV",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('LKP_CSV').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "LKP_Modified_time",
+							"type": "Lookup",
+							"dependsOn": [
+								{
+									"activity": "Set_DateTimeColumn",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 3,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderQuery": {
+										"value": "@concat('select max(\"',variables('dateTimeCol'),'\") as max',' from ',variables('schema_name'),'.\"',variables('table_name'),'\"')",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "DS_AZU_SQL_D365_DEV",
+									"type": "DatasetReference",
+									"parameters": {
+										"schema_name": {
+											"value": "@variables('schema_name')",
+											"type": "Expression"
+										},
+										"table_name": {
+											"value": "@variables('table_name')",
+											"type": "Expression"
+										}
+									}
+								},
+								"firstRowOnly": true
+							}
+						},
+						{
+							"name": "Set_Schema_Name",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "schema_name",
+								"value": {
+									"value": "@item().SchemaName",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Set_Table_Name",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Set_Schema_Name",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "table_name",
+								"value": {
+									"value": "@item().TableName",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Set_DateTimeColumn",
+							"description": "",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Set_Table_Name",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "dateTimeCol",
+								"value": {
+									"value": "@item().DateTimeColumn",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Set_fromDate",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "LKP_Modified_time",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "fromDate",
+								"value": {
+									"value": "@addseconds(coalesce(activity('LKP_Modified_time').output.firstRow.max,'1970-11-23T08:38:07.4232005Z'),2)",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Set_toDate",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Set_fromDate",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "toDate",
+								"value": {
+									"value": "@addseconds(utcnow(),3)",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Set_EntityPath",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Set_EntityManiFestName",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "EntityPath",
+								"value": {
+									"value": "@item().EntityPath",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Set_EntityManiFestName",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Set_EntityName",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "EntityManifestName",
+								"value": {
+									"value": "@item().ManifestName",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Set_EntityName",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Set_container",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "EntityName",
+								"value": {
+									"value": "@item().EntityName",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "DF_DynamicCDM",
+							"type": "ExecuteDataFlow",
+							"dependsOn": [
+								{
+									"activity": "Set_ADLPath",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "1.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataflow": {
+									"referenceName": "DF_DynamicCDM_UAT",
+									"type": "DataFlowReference",
+									"parameters": {
+										"fromDate": {
+											"value": "'@{variables('fromDate')}'",
+											"type": "Expression"
+										},
+										"toDate": {
+											"value": "'@{variables('toDate')}'",
+											"type": "Expression"
+										},
+										"EntityPath": {
+											"value": "'@{variables('EntityPath')}'",
+											"type": "Expression"
+										},
+										"EntityManifestName": {
+											"value": "'@{variables('EntityManifestName')}'",
+											"type": "Expression"
+										},
+										"EntityName": {
+											"value": "'@{variables('EntityName')}'",
+											"type": "Expression"
+										},
+										"Root": {
+											"value": "'@{variables('Root')}'",
+											"type": "Expression"
+										},
+										"Container": {
+											"value": "'@{variables('Container')}'",
+											"type": "Expression"
+										},
+										"KeyColumn": {
+											"value": "'@{variables('KeyColumn')}'",
+											"type": "Expression"
+										}
+									},
+									"datasetParameters": {
+										"TGTADLS": {
+											"ADLRoot": {
+												"value": "@variables('ADLRoot')",
+												"type": "Expression"
+											},
+											"ADLPath": {
+												"value": "@variables('ADLPath')",
+												"type": "Expression"
+											}
+										},
+										"TGTSQLSERVER": {
+											"schema_name": "@variables('schema_name')",
+											"table_name": "@variables('table_name')"
+										}
+									}
+								},
+								"integrationRuntime": {
+									"referenceName": "IR-PEP-GP-WEUR",
+									"type": "IntegrationRuntimeReference"
+								},
+								"traceLevel": "Coarse"
+							}
+						},
+						{
+							"name": "Set_Error_Msg",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "LKP_Modified_time",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "Error_Msg",
+								"value": {
+									"value": "@activity('LKP_Modified_time').Error.Message",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "If Condition Check Error Type",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "Set_Error_Msg",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@contains(variables('Error_Msg'),'Invalid object name')",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "Set_False",
+										"type": "SetVariable",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "Error_Msg",
+											"value": {
+												"value": "@activity('LKP_Modified_time').Error.Message",
+												"type": "Expression"
+											}
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "Set_MSG__Full_Load",
+										"type": "SetVariable",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "Error_Msg",
+											"value": "'Table Does Not Exist Creating Table'"
+										}
+									},
+									{
+										"name": "Set_fromDate_Full_Load",
+										"type": "SetVariable",
+										"dependsOn": [
+											{
+												"activity": "Set_MSG__Full_Load",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "fromDate",
+											"value": "1970-11-23T08:38:07.4232005Z"
+										}
+									},
+									{
+										"name": "Set_toDate__Full_Load",
+										"type": "SetVariable",
+										"dependsOn": [
+											{
+												"activity": "Set_fromDate_Full_Load",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "toDate",
+											"value": {
+												"value": "@if(empty(variables('FUllLoadLimitDate')),utcnow(),variables('FUllLoadLimitDate'))",
+												"type": "Expression"
+											}
+										}
+									},
+									{
+										"name": "Set_EntityName__Full_Load",
+										"type": "SetVariable",
+										"dependsOn": [
+											{
+												"activity": "Set_EntityPath__Full_Load",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "EntityName",
+											"value": {
+												"value": "@item().EntityName",
+												"type": "Expression"
+											}
+										}
+									},
+									{
+										"name": "Set_EntityManiFestName__Full_Load",
+										"type": "SetVariable",
+										"dependsOn": [
+											{
+												"activity": "Set_EntityName__Full_Load",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "EntityManifestName",
+											"value": {
+												"value": "@item().ManifestName",
+												"type": "Expression"
+											}
+										}
+									},
+									{
+										"name": "Set_EntityPath__Full_Load",
+										"type": "SetVariable",
+										"dependsOn": [
+											{
+												"activity": "Set_container_Full_Load",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "EntityPath",
+											"value": {
+												"value": "@item().EntityPath",
+												"type": "Expression"
+											}
+										}
+									},
+									{
+										"name": "DF_DynamicCDM_Full_Load",
+										"type": "ExecuteDataFlow",
+										"dependsOn": [
+											{
+												"activity": "Set_ADLPath_Full_Load",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "1.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"dataflow": {
+												"referenceName": "DF_DynamicCDM_UAT",
+												"type": "DataFlowReference",
+												"parameters": {
+													"fromDate": {
+														"value": "'@{variables('fromDate')}'",
+														"type": "Expression"
+													},
+													"toDate": {
+														"value": "'@{variables('toDate')}'",
+														"type": "Expression"
+													},
+													"EntityPath": {
+														"value": "'@{variables('EntityPath')}'",
+														"type": "Expression"
+													},
+													"EntityManifestName": {
+														"value": "'@{variables('EntityManifestName')}'",
+														"type": "Expression"
+													},
+													"EntityName": {
+														"value": "'@{variables('EntityName')}'",
+														"type": "Expression"
+													},
+													"Root": {
+														"value": "'@{variables('Root')}'",
+														"type": "Expression"
+													},
+													"Container": {
+														"value": "'@{variables('Container')}'",
+														"type": "Expression"
+													},
+													"KeyColumn": {
+														"value": "'@{variables('KeyColumn')}'",
+														"type": "Expression"
+													}
+												},
+												"datasetParameters": {
+													"TGTADLS": {
+														"ADLRoot": {
+															"value": "@variables('ADLRoot')",
+															"type": "Expression"
+														},
+														"ADLPath": {
+															"value": "@variables('ADLPath')",
+															"type": "Expression"
+														}
+													},
+													"TGTSQLSERVER": {
+														"schema_name": "@variables('schema_name')",
+														"table_name": "@variables('table_name')"
+													}
+												}
+											},
+											"integrationRuntime": {
+												"referenceName": "IR-PEP-GP-WEUR",
+												"type": "IntegrationRuntimeReference"
+											},
+											"traceLevel": "Coarse"
+										}
+									},
+									{
+										"name": "Set_Root_Full_Load",
+										"type": "SetVariable",
+										"dependsOn": [
+											{
+												"activity": "Set_toDate__Full_Load",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "Root",
+											"value": {
+												"value": "@item().Root",
+												"type": "Expression"
+											}
+										}
+									},
+									{
+										"name": "Set_container_Full_Load",
+										"type": "SetVariable",
+										"dependsOn": [
+											{
+												"activity": "Set_Root_Full_Load",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "Container",
+											"value": {
+												"value": "@item().Container",
+												"type": "Expression"
+											}
+										}
+									},
+									{
+										"name": "Set_KeyColumn_Full_Load",
+										"type": "SetVariable",
+										"dependsOn": [
+											{
+												"activity": "Set_EntityManiFestName__Full_Load",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "KeyColumn",
+											"value": {
+												"value": "@item().KeyColumn",
+												"type": "Expression"
+											}
+										}
+									},
+									{
+										"name": "Set_ADLRoot_Full_Load",
+										"type": "SetVariable",
+										"dependsOn": [
+											{
+												"activity": "Set_KeyColumn_Full_Load",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "ADLRoot",
+											"value": {
+												"value": "@item().ADLRoot",
+												"type": "Expression"
+											}
+										}
+									},
+									{
+										"name": "Set_ADLPath_Full_Load",
+										"type": "SetVariable",
+										"dependsOn": [
+											{
+												"activity": "Set_ADLRoot_Full_Load",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "ADLPath",
+											"value": {
+												"value": "@concat(item().ADLPath,'/',variables('EntityName'),'/',utcNow('yyyy/MM/dd'))",
+												"type": "Expression"
+											}
+										}
+									}
+								]
+							}
+						},
+						{
+							"name": "Set_Root",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Set_toDate",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "Root",
+								"value": {
+									"value": "@item().Root",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Set_container",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Set_Root",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "Container",
+								"value": {
+									"value": "@item().Container",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Set_KeyColumn",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Set_EntityPath",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "KeyColumn",
+								"value": {
+									"value": "@item().KeyColumn",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Set_ADLRoot",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Set_KeyColumn",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "ADLRoot",
+								"value": {
+									"value": "@item().ADLRoot",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Set_ADLPath",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Set_ADLRoot",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "ADLPath",
+								"value": {
+									"value": "@concat(item().ADLPath,'/',variables('EntityName'),'/',utcNow('yyyy/MM/dd'))",
+									"type": "Expression"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Set_Error",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "ForEach_Table",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "Error_Msg",
+					"value": "'Error Check Activity'"
+				}
+			},
+			{
+				"name": "Set_FUllLoadLimitDate",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "FUllLoadLimitDate",
+					"value": {
+						"value": "@utcnow()",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"variables": {
+			"schema_name": {
+				"type": "String"
+			},
+			"table_name": {
+				"type": "String"
+			},
+			"toDate": {
+				"type": "String"
+			},
+			"fromDate": {
+				"type": "String"
+			},
+			"dateTimeCol": {
+				"type": "String"
+			},
+			"EntityPath": {
+				"type": "String"
+			},
+			"EntityManifestName": {
+				"type": "String"
+			},
+			"EntityName": {
+				"type": "String"
+			},
+			"Error_Msg": {
+				"type": "String"
+			},
+			"Root": {
+				"type": "String"
+			},
+			"Container": {
+				"type": "String"
+			},
+			"ADLRoot": {
+				"type": "String"
+			},
+			"ADLPath": {
+				"type": "String"
+			},
+			"KeyColumn": {
+				"type": "String"
+			},
+			"FUllLoadLimitDate": {
+				"type": "String"
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2022-04-26T03:36:49Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

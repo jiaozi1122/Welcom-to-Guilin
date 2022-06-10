@@ -1,0 +1,48 @@
+{
+	"name": "DF_DynamicCDM_UAT",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"linkedService": {
+						"referenceName": "AzureDataLakeStorage2",
+						"type": "LinkedServiceReference"
+					},
+					"name": "SCRCDM"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "DS_Parquet_ADLS_GDP_DEV",
+						"type": "DatasetReference"
+					},
+					"name": "TGTADLS"
+				},
+				{
+					"dataset": {
+						"referenceName": "DS_AZU_SQL_D365_DEV",
+						"type": "DatasetReference"
+					},
+					"name": "TGTSQLSERVER"
+				}
+			],
+			"transformations": [
+				{
+					"name": "DerivedColumnExtra2"
+				},
+				{
+					"name": "DerivedColumnExtra1"
+				},
+				{
+					"name": "AlterRowUpsert"
+				},
+				{
+					"name": "filter1"
+				}
+			],
+			"script": "parameters{\n\tfromDate as string,\n\ttoDate as string,\n\tEntityPath as string,\n\tEntityManifestName as string,\n\tEntityName as string,\n\tRoot as string,\n\tContainer as string,\n\tKeyColumn as string\n}\nsource(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tinferDriftedColumnTypes: true,\n\tignoreNoFilesFound: true,\n\tmodifiedAfter: (toTimestamp($fromDate,'yyyy-MM-dd\\'T\\'HH:mm:ss')),\n\tmodifiedBefore: (toTimestamp($toDate,'yyyy-MM-dd\\'T\\'HH:mm:ss')),\n\tentity: ($EntityName),\n\tformat: 'cdm',\n\tmanifestType: 'manifest',\n\tmanifestName: ($EntityManifestName),\n\tentityPath: ($EntityPath),\n\tlocal: true,\n\tfolderPath: ($Container),\n\tfileSystem: ($Root),\n\tdateFormats: ['yyyy-MM-dd'],\n\ttimestampFormats: ['yyyy-MM-dd\\'T\\'HH:mm:ss'],\n\tpreferredIntegralType: 'long',\n\tpreferredFractionalType: 'double') ~> SCRCDM\nfilter1 derive(LSN = iifNull(toString(byName('LSN')),toString(byName('Start_LSN'))),\n\t\t{_SysRowId} = iifNull(toString(byName('_SysRowId')),toString(byName('RECID'))),\n\t\tStart_LSN = iifNull(toString(byName('Start_LSN')),toString(byName('LSN'))),\n\t\tEnd_LSN = toString(byName('End_LSN')),\n\t\tDML_Action = toString(byName('DML_Action')),\n\t\tSeq_Val = toString(byName('Seq_Val')),\n\t\tUpdate_Mask = toString(byName('Update_Mask')),\n\t\teach(match(type=='string'), $$ = iifNull(toString($$), ''))) ~> DerivedColumnExtra2\nfilter1 derive(LSN = iifNull(toString(byName('LSN')),toString(byName('Start_LSN'))),\n\t\t{_SysRowId} = iifNull(toString(byName('_SysRowId')),toString(byName('RECID'))),\n\t\tStart_LSN = iifNull(toString(byName('Start_LSN')),toString(byName('LSN'))),\n\t\tEnd_LSN = toString(byName('End_LSN')),\n\t\tDML_Action = toString(byName('DML_Action')),\n\t\tSeq_Val = toString(byName('Seq_Val')),\n\t\tUpdate_Mask = toString(byName('Update_Mask')),\n\t\teach(match(type=='string'), $$ = iifNull(toString($$), ''))) ~> DerivedColumnExtra1\nDerivedColumnExtra2 alterRow(upsertIf(false())) ~> AlterRowUpsert\nSCRCDM filter(toString(byName('JOURNALNUM'))=='1052-000290') ~> filter1\nDerivedColumnExtra1 sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tformat: 'parquet',\n\tfilePattern:(concat(concat($EntityName,'_'),toString(currentTimestamp(),'yyyyMMddHHmmss'),'.parquet')),\n\tumask: 0022,\n\tpreCommands: [],\n\tpostCommands: [],\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> TGTADLS\nAlterRowUpsert sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tdeletable:false,\n\tinsertable:true,\n\tupdateable:false,\n\tupsertable:false,\n\ttruncate:true,\n\tformat: 'table',\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true,\n\terrorHandlingOption: 'stopOnFirstError',\n\toutputRejectedData: true,\n\trejectedData_folderPath: 'D365FI/Global/Error') ~> TGTSQLSERVER"
+		}
+	}
+}

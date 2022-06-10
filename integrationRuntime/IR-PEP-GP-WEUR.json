@@ -1,0 +1,11 @@
+{
+	"name": "IR-PEP-GP-WEUR",
+	"properties": {
+		"type": "Managed",
+		"typeProperties": {
+			"computeProperties": {
+				"location": "AutoResolve"
+			}
+		}
+	}
+}

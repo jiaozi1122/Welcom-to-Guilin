@@ -1,0 +1,27 @@
+{
+	"name": "ls_ADLS_GDP_DEV",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"type": "AzureBlobFS",
+		"typeProperties": {
+			"url": "https://sagseurwwdevgdp001.dfs.core.windows.net/",
+			"servicePrincipalId": "53ef10b8-9ee9-4157-a85b-c6d63bb2c016",
+			"tenant": "f30ac191-b8b4-45f2-9a9b-e5466cb90c2f",
+			"servicePrincipalCredentialType": "ServicePrincipalKey",
+			"servicePrincipalCredential": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AZ_KV_ADLS_GDP_DEV",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "Dev-datalake-Clientsecret"
+			}
+		},
+		"connectVia": {
+			"referenceName": "IR-PEP-GP-WEUR",
+			"type": "IntegrationRuntimeReference"
+		},
+		"description": "DEV Azure data lake Storage Gen2 ",
+		"annotations": []
+	}
+}
